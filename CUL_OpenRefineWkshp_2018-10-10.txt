@@ -1,0 +1,74 @@
+Columbia University Libraries
+Workshop: OpenRefine
+Part 2: Enhancing data with OpenRefine
+October 10, 2018
+Butler Library 306
+
+Ryan Mendenhall
+trm2151@columbia.edu
+212-851-2452
+
+URLs for reconciliation services:
+
+Library of Congress / NACO authority file via VIAF proxy (conciliator):
+http://refine.codefork.com/reconcile/viafproxy/LC
+WIKIDATA (should already be installed and available as a reconciliation service)
+https://tools.wmflabs.org/openrefine-wikidata/en/api
+
+
+EXERCISE 2
+GREL for extracting identifiers, preferred labels, and URIs from the reconciliation service:
+
+Preferred label: cell.recon.match.name
+Identifier (see following for URI): cell.recon.match.id
+
+From the Identifier, you can construct the URI based on the controlled vocabulary's URL handle.
+In our example, we are using LC/NAF, which has a preferred handled of:
+http://id.loc.gov/authorities/names/  So....
+
+URI: "http://id.loc.gov/authorities/names/" + cell.recon.match.id
+
+
+
+EXERCISE 4:
+
+Sample query of FAST API for the term Theater:
+
+http://fast.oclc.org/searchfast/fastsuggest?query=Theater&rows=30&queryReturn=suggestall+idroot+auth+cscore&suggest=autoSubject&queryIndex=suggest50&wt=json
+
+Edit column --> Add column by fetching URLs
+GREL:
+
+"http://fast.oclc.org/searchfast/fastsuggest?query="+ value.replace(/[\s\-\.\,\:\(\)]/,"%20") +"&rows=30&queryReturn=suggestall%2Cidroot%2Cauth%2cscore&suggest=autoSubject&queryIndex=suggest50&wt=json"
+
+On the returned results [make sure you are using Rows view, NOT Record view]:
+
+forEach(value.parseJson().response.docs,v,if(v.auth == cells["Subject"].value,"http://id.worldcat.org/fast/"+substring(v.idroot,3),"")).uniques().join("")
+
+
+
+EXERCISE 5:
+
+Sample SPARQL query:
+SELECT ?x ?label
+	{
+?x skos:inScheme aat:;
+     	(xl:prefLabel|xl:altLabel)/gvp:term "painting"@en;
+     	skos:prefLabel ?label 
+	FILTER(lang(?label)="en").
+	}
+
+That query embedded in GREL for Edit column --> Add column based on this column
+
+'http://vocab.getty.edu/sparql.json?query=select+?x+?label{?x+skos:inScheme+aat:;(xl:prefLabel|xl:altLabel)/gvp:term"' + escape(value, 'url') + '"@en;skos:prefLabel+?label+filter(lang(?label)="en").}'
+
+GREL to grab URI from returned query results:
+
+forEach(value.parseJson().results.bindings,v,if(v.label.value == cells["Form"].value,v.x.value,"")).uniques().join("")
+
+
+EXERCISE 6:
+
+Collection column: Edit column --> Add column based on this column
+GREL:
+cell.cross('CUL_DLC_Locations', 'Label').cells['URI'].value[0]
